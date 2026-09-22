@@ -59,6 +59,18 @@ func TestSchemeRegistration(t *testing.T) {
 			t.Error("expected ClusterList to be registered in scheme")
 		}
 	})
+
+	t.Run("When gecko public types are registered it should recognize Version", func(t *testing.T) {
+		if !scheme.Recognizes(gcpv1.GroupVersion.WithKind("Version")) {
+			t.Error("expected Version to be registered in scheme")
+		}
+	})
+
+	t.Run("When gecko public types are registered it should recognize VersionList", func(t *testing.T) {
+		if !scheme.Recognizes(gcpv1.GroupVersion.WithKind("VersionList")) {
+			t.Error("expected VersionList to be registered in scheme")
+		}
+	})
 }
 
 func TestNamespaceForProject(t *testing.T) {

@@ -18,6 +18,7 @@ import (
 	"github.com/openshift-online/gcp-hcp-ctl/pkg/platformapi"
 	gcpv1 "github.com/openshift-online/gecko/platform-api/api/public/v1"
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -145,6 +146,11 @@ func (o *createOptions) run(cmd *cobra.Command, clusterName string) error {
 		return fmt.Errorf("--oidc-endpoint is required (or set GCPHCPCTL_OIDC_ENDPOINT or oidc_endpoint in config)")
 	}
 
+	client := clientFromCmd(cmd)
+	if err := validateVersion(cmd.Context(), client.Versions(), o.version, o.channelGroup); err != nil {
+		return err
+	}
+
 	infraID, err := generateCompliantInfraID(clusterName)
 	if err != nil {
 		return fmt.Errorf("generating infra ID: %w", err)
@@ -156,8 +162,6 @@ func (o *createOptions) run(cmd *cobra.Command, clusterName string) error {
 	if region == "" {
 		region = "us-central1"
 	}
-
-	client := clientFromCmd(cmd)
 
 	bpo := buildPayloadOptions{
 		clusterName:    clusterName,
@@ -212,6 +216,24 @@ func (o *createOptions) run(cmd *cobra.Command, clusterName string) error {
 	}
 
 	return printCluster(cmd.OutOrStdout(), created, o.outputFmt)
+}
+
+func validateVersion(ctx context.Context, versions platformapi.VersionInterface, version, channelGroup string) error {
+	release, err := versions.Get(ctx, version)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("version %q is not supported", version)
+	}
+	if err != nil {
+		return fmt.Errorf("validating version %q: %w", version, err)
+	}
+
+	for _, group := range release.Spec.ChannelGroups {
+		if group == channelGroup {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("version %q is not available in channel group %q", version, channelGroup)
 }
 
 type buildPayloadOptions struct {

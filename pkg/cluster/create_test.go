@@ -1,17 +1,76 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/openshift-online/gcp-hcp-ctl/pkg/infra/iam"
 	"github.com/openshift-online/gcp-hcp-ctl/pkg/infra/network"
+	gcpv1 "github.com/openshift-online/gecko/platform-api/api/public/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var infraIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*-[0-9a-f]{4}$`)
+
+type fakeVersionClient struct {
+	version *gcpv1.Version
+	err     error
+}
+
+func (f *fakeVersionClient) Get(context.Context, string) (*gcpv1.Version, error) {
+	return f.version, f.err
+}
+
+func TestValidateVersion(t *testing.T) {
+	t.Run("When version belongs to the channel group it should succeed", func(t *testing.T) {
+		versions := &fakeVersionClient{version: &gcpv1.Version{
+			Spec: gcpv1.VersionSpec{ChannelGroups: []string{"fast", "stable"}},
+		}}
+
+		if err := validateVersion(context.Background(), versions, "4.22.13", "stable"); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("When version does not belong to the channel group it should fail", func(t *testing.T) {
+		versions := &fakeVersionClient{version: &gcpv1.Version{
+			Spec: gcpv1.VersionSpec{ChannelGroups: []string{"candidate", "fast"}},
+		}}
+
+		err := validateVersion(context.Background(), versions, "4.22.14", "stable")
+		if err == nil || !strings.Contains(err.Error(), `not available in channel group "stable"`) {
+			t.Fatalf("expected channel-group validation error, got %v", err)
+		}
+	})
+
+	t.Run("When version does not exist it should report that it is unsupported", func(t *testing.T) {
+		versions := &fakeVersionClient{err: apierrors.NewNotFound(
+			schema.GroupResource{Group: gcpv1.GroupVersion.Group, Resource: "versions"},
+			"4.21.0",
+		)}
+
+		err := validateVersion(context.Background(), versions, "4.21.0", "stable")
+		if err == nil || err.Error() != `version "4.21.0" is not supported` {
+			t.Fatalf("expected unsupported-version error, got %v", err)
+		}
+	})
+
+	t.Run("When the API request fails it should preserve the cause", func(t *testing.T) {
+		versions := &fakeVersionClient{err: errors.New("API unavailable")}
+
+		err := validateVersion(context.Background(), versions, "4.22.13", "stable")
+		if err == nil || !strings.Contains(err.Error(), "API unavailable") {
+			t.Fatalf("expected API error, got %v", err)
+		}
+	})
+}
 
 func TestGenerateCompliantInfraID(t *testing.T) {
 	t.Run("When given a simple cluster name it should produce a valid infra ID", func(t *testing.T) {

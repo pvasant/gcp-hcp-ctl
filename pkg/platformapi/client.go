@@ -108,6 +108,11 @@ func (c *Client) NodePools() NodePoolInterface {
 	return &nodePoolClient{restClient: c.restClient}
 }
 
+// Versions returns a VersionInterface for performing version operations.
+func (c *Client) Versions() VersionInterface {
+	return &versionClient{restClient: c.restClient}
+}
+
 // ClusterInterface defines operations on Cluster resources.
 type ClusterInterface interface {
 	Create(ctx context.Context, namespace string, cluster *gcpv1.Cluster) (*gcpv1.Cluster, error)
@@ -160,6 +165,25 @@ func (c *clusterClient) Delete(ctx context.Context, namespace, name string) erro
 		Name(name).
 		Do(ctx).
 		Error()
+}
+
+// VersionInterface defines operations on cluster-scoped Version resources.
+type VersionInterface interface {
+	Get(ctx context.Context, name string) (*gcpv1.Version, error)
+}
+
+type versionClient struct {
+	restClient rest.Interface
+}
+
+func (v *versionClient) Get(ctx context.Context, name string) (*gcpv1.Version, error) {
+	result := &gcpv1.Version{}
+	err := v.restClient.Get().
+		Resource("versions").
+		Name(name).
+		Do(ctx).
+		Into(result)
+	return result, err
 }
 
 // ResolveCluster finds a cluster by name within the client's project namespace.

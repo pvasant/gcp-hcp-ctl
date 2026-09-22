@@ -132,7 +132,7 @@ func (o *createOptions) run(cmd *cobra.Command, clusterName string) error {
 	}
 
 	switch o.channelGroup {
-	case "", "stable", "fast", "candidate", "eus":
+	case "stable", "fast", "candidate", "eus":
 	default:
 		return fmt.Errorf("--channel-group must be one of: stable, fast, candidate, eus")
 	}

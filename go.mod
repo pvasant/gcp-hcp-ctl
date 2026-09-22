@@ -1,6 +1,6 @@
 module github.com/openshift-online/gcp-hcp-ctl
 
-go 1.26.4
+go 1.26.6
 
 require (
 	cloud.google.com/go/privilegedaccessmanager v1.1.0

@@ -13,7 +13,6 @@ import (
 	"github.com/openshift-online/gcp-hcp-ctl/pkg/infra/iam"
 	"github.com/openshift-online/gcp-hcp-ctl/pkg/infra/network"
 	gcpv1 "github.com/openshift-online/gecko/platform-api/api/public/v1"
-	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -51,6 +50,17 @@ func TestValidateVersion(t *testing.T) {
 		}
 	})
 
+	t.Run("When channel group is empty it should fail", func(t *testing.T) {
+		versions := &fakeVersionClient{version: &gcpv1.Version{
+			Spec: gcpv1.VersionSpec{ChannelGroups: []string{"fast", "stable"}},
+		}}
+
+		err := validateVersion(context.Background(), versions, "4.22.13", "")
+		if err == nil || !strings.Contains(err.Error(), `not available in channel group ""`) {
+			t.Fatalf("expected empty channel-group validation error, got %v", err)
+		}
+	})
+
 	t.Run("When version does not exist it should report that it is unsupported", func(t *testing.T) {
 		versions := &fakeVersionClient{err: apierrors.NewNotFound(
 			schema.GroupResource{Group: gcpv1.GroupVersion.Group, Resource: "versions"},
@@ -71,18 +81,6 @@ func TestValidateVersion(t *testing.T) {
 			t.Fatalf("expected API error, got %v", err)
 		}
 	})
-}
-
-func TestCreateOptionsRunRejectsEmptyChannelGroup(t *testing.T) {
-	opts := createOptions{
-		endpointAccess: "PublicAndPrivate",
-		version:        "4.22.13",
-	}
-
-	err := opts.run(&cobra.Command{}, "test-cluster")
-	if err == nil || err.Error() != "--channel-group must be one of: stable, fast, candidate, eus" {
-		t.Fatalf("expected empty channel-group validation error, got %v", err)
-	}
 }
 
 func TestGenerateCompliantInfraID(t *testing.T) {

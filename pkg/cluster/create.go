@@ -113,7 +113,8 @@ Both --iam-config-file and --network-config-file are required in config-file mod
 	cmd.Flags().BoolVar(&opts.setupInfra, "setup-infra", false, "Automatically provision IAM and network infrastructure before creating cluster")
 	cmd.Flags().StringVar(&opts.endpointAccess, "endpoint-access", "PublicAndPrivate", "API server endpoint access: Private or PublicAndPrivate")
 	cmd.Flags().StringVar(&opts.version, "version", "", "OCP version (e.g. 4.22.0-rc.5)")
-	cmd.Flags().StringVar(&opts.channelGroup, "channel-group", "stable", "Channel group: stable, fast, candidate, eus")
+	cmd.Flags().StringVar(&opts.channelGroup, "channel-group", "stable", "Release channel group")
+	_ = cmd.Flags().MarkHidden("channel-group")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Show payload without creating")
 	cmd.Flags().StringVarP(&opts.outputFmt, "output", "o", "text", "Output format: text, json, yaml")
 
@@ -131,14 +132,11 @@ func (o *createOptions) run(cmd *cobra.Command, clusterName string) error {
 		return fmt.Errorf("--endpoint-access must be one of: Private, PublicAndPrivate")
 	}
 
-	switch o.channelGroup {
-	case "stable", "fast", "candidate", "eus":
-	default:
-		return fmt.Errorf("--channel-group must be one of: stable, fast, candidate, eus")
-	}
-
 	if o.version == "" {
 		return fmt.Errorf("--version is required (e.g. --version 4.22.0)")
+	}
+	if o.channelGroup == "" {
+		return fmt.Errorf("--channel-group is required")
 	}
 
 	oidcBase, _ := cmd.Flags().GetString("oidc-endpoint")
